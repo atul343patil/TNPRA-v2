@@ -16,7 +16,7 @@ const customerSchema = new mongoose.Schema({
   // A/c Number from Excel - This is unique
   accountNumber: {
     type: String,
-    unique: true,
+    // unique: true,
     sparse: true
   },
   // A/c Name from Excel
@@ -101,15 +101,15 @@ const customerSchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-customerSchema.index({ branchName: 1, isRecovered: 1 });
-customerSchema.index({ assetClassification: 1 });
-customerSchema.index({ dateOfNPA: 1 });
+// customerSchema.index({ branchName: 1, isRecovered: 1 });
+// customerSchema.index({ assetClassification: 1 });
+// customerSchema.index({ dateOfNPA: 1 });
 // Compound index for unique account number per bank and branch
 customerSchema.index(
   { accountNumber: 1, bankName: 1, branchName: 1 }, 
   { unique: true, sparse: true }
 );
-customerSchema.index({ assignedTo: 1 });
+// customerSchema.index({ assignedTo: 1 });
 
 // Remove any existing indexes that might cause problems
 mongoose.connection.collections['customers']?.dropIndexes()

@@ -174,11 +174,14 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
 router.get('/branches', protect, async (req, res) => {
   try {
     // Aggregate to get unique combinations of branchName and bankName
+    // and include the assigned officer information
     const branches = await Customer.aggregate([
       { 
         $group: { 
           _id: { branchName: "$branchName", bankName: "$bankName" },
-          count: { $sum: 1 }
+          count: { $sum: 1 },
+          // Get all unique officers assigned to this branch
+          officers: { $addToSet: "$assignedTo" }
         } 
       },
       {
@@ -186,7 +189,8 @@ router.get('/branches', protect, async (req, res) => {
           _id: 0,
           branchName: "$_id.branchName",
           bankName: "$_id.bankName",
-          customerCount: "$count"
+          customerCount: "$count",
+          officers: 1
         }
       },
       { $sort: { bankName: 1, branchName: 1 } }
