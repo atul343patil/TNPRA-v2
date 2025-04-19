@@ -104,7 +104,11 @@ const customerSchema = new mongoose.Schema({
 customerSchema.index({ branchName: 1, isRecovered: 1 });
 customerSchema.index({ assetClassification: 1 });
 customerSchema.index({ dateOfNPA: 1 });
-customerSchema.index({ accountNumber: 1 }, { unique: true, sparse: true });
+// Compound index for unique account number per bank and branch
+customerSchema.index(
+  { accountNumber: 1, bankName: 1, branchName: 1 }, 
+  { unique: true, sparse: true }
+);
 customerSchema.index({ assignedTo: 1 });
 
 // Remove any existing indexes that might cause problems

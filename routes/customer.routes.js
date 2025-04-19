@@ -37,6 +37,11 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
       try {
         // Ensure we're using the correct field name for account number
         const accountNumber = customer.accountNumber || customer.ACCOUNT_NUMBER;
+        const bankName = customer.bankName;
+        const branchName = customer.branchName;
+        console.log('Processing customer:', customer.accountNumber);
+        console.log('Bank name:', bankName);
+        console.log('Branch name:', branchName);
         
         if (!accountNumber) {
           results.errors.push({
@@ -46,41 +51,80 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
           continue;
         }
         
-        // Check if this account number already exists
-        const existingCustomer = await Customer.findOne({ accountNumber });
-        
-        if (existingCustomer) {
-          // Skip this customer as it's a duplicate
-          results.duplicates.push({
-            accountNumber: accountNumber,
-            reason: 'Account number already exists in database'
+        if (!bankName) {
+          results.errors.push({
+            customer: customer,
+            error: 'Missing bank name'
           });
           continue;
         }
         
-        // Normalize field names if needed
-        const normalizedCustomer = { ...customer };
+        if (!branchName) {
+          results.errors.push({
+            customer: customer,
+            error: 'Missing branch name'
+          });
+          continue;
+        }
         
-        // Ensure we're using the correct field names
+        // Directly insert each customer without duplicate checking
+        // Normalize fields as before
+        const normalizedCustomer = { ...customer };
         if (customer.ACCOUNT_NUMBER && !customer.accountNumber) {
           normalizedCustomer.accountNumber = customer.ACCOUNT_NUMBER;
           delete normalizedCustomer.ACCOUNT_NUMBER;
         }
-        
         if (customer.OUTSTANDING_BALANCE && !customer.outstandingBalance) {
           normalizedCustomer.outstandingBalance = customer.OUTSTANDING_BALANCE;
           delete normalizedCustomer.OUTSTANDING_BALANCE;
         }
-        
         if (customer.PRINCIPLE_OVERDUE && !customer.principleOverdue) {
           normalizedCustomer.principleOverdue = customer.PRINCIPLE_OVERDUE;
           delete normalizedCustomer.PRINCIPLE_OVERDUE;
         }
-        
         if (customer.INTEREST_OVERDUE && !customer.interestOverdue) {
           normalizedCustomer.interestOverdue = customer.INTEREST_OVERDUE;
           delete normalizedCustomer.INTEREST_OVERDUE;
         }
+        // Attempt to insert, catch MongoDB errors (like duplicate key)
+        try {
+          const newCustomer = new Customer(normalizedCustomer);
+          await newCustomer.save();
+          results.inserted.push(newCustomer);
+        } catch (error) {
+          results.errors.push({
+            accountNumber: customer.accountNumber || customer.ACCOUNT_NUMBER,
+            accountName: customer.accountName || customer.ACCOUNT_NAME,
+            branchName: customer.branchName || customer.BRANCH_NAME,
+            bankName: customer.bankName || customer.BANK_NAME,
+            error: error.message
+          });
+        }
+        continue;
+        
+        // Normalize field names if needed
+        // const normalizedCustomer = { ...customer };
+        
+        // Ensure we're using the correct field names
+        // if (customer.ACCOUNT_NUMBER && !customer.accountNumber) {
+        //   normalizedCustomer.accountNumber = customer.ACCOUNT_NUMBER;
+        //   delete normalizedCustomer.ACCOUNT_NUMBER;
+        // }
+        
+        // if (customer.OUTSTANDING_BALANCE && !customer.outstandingBalance) {
+        //   normalizedCustomer.outstandingBalance = customer.OUTSTANDING_BALANCE;
+        //   delete normalizedCustomer.OUTSTANDING_BALANCE;
+        // }
+        
+        // if (customer.PRINCIPLE_OVERDUE && !customer.principleOverdue) {
+        //   normalizedCustomer.principleOverdue = customer.PRINCIPLE_OVERDUE;
+        //   delete normalizedCustomer.PRINCIPLE_OVERDUE;
+        // }
+        
+        // if (customer.INTEREST_OVERDUE && !customer.interestOverdue) {
+        //   normalizedCustomer.interestOverdue = customer.INTEREST_OVERDUE;
+        //   delete normalizedCustomer.INTEREST_OVERDUE;
+        // }
         
         // Create and save the new customer
         const newCustomer = new Customer(normalizedCustomer);
@@ -90,12 +134,15 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
         // Handle individual customer errors
         results.errors.push({
           accountNumber: customer.accountNumber || customer.ACCOUNT_NUMBER,
+          accountName: customer.accountName || customer.ACCOUNT_NAME,
+          branchName: customer.branchName || customer.BRANCH_NAME,
+          bankName: customer.bankName || customer.BANK_NAME,
           error: error.message
         });
       }
     }
     
-    // Return appropriate response
+    // Return appropriate response with detailed information
     return res.status(200).json({
       message: 'Import completed with some results',
       summary: {
@@ -106,7 +153,11 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
       },
       inserted: results.inserted,
       duplicates: results.duplicates,
-      errors: results.errors
+      errors: results.errors,
+      // Include the first 10 duplicates for inspection
+      duplicatesSample: results.duplicates.slice(0, 10),
+      // Include the first 10 errors for inspection
+      errorsSample: results.errors.slice(0, 10)
     });
   } catch (err) {
     console.error('Bulk import error:', err);
@@ -114,6 +165,37 @@ router.post('/bulk', protect, authorize('ADMIN', 'OFFICER'), async (req, res) =>
       message: 'Server error during bulk import',
       error: err.message
     });
+  }
+});
+
+// @route   GET /api/customers/branches
+// @desc    Get all unique branches with their bank names
+// @access  Private
+router.get('/branches', protect, async (req, res) => {
+  try {
+    // Aggregate to get unique combinations of branchName and bankName
+    const branches = await Customer.aggregate([
+      { 
+        $group: { 
+          _id: { branchName: "$branchName", bankName: "$bankName" },
+          count: { $sum: 1 }
+        } 
+      },
+      {
+        $project: {
+          _id: 0,
+          branchName: "$_id.branchName",
+          bankName: "$_id.bankName",
+          customerCount: "$count"
+        }
+      },
+      { $sort: { bankName: 1, branchName: 1 } }
+    ]);
+    
+    res.json(branches);
+  } catch (err) {
+    console.error('Error fetching branches:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -126,6 +208,7 @@ router.get('/', protect, async (req, res) => {
       page = 1,
       limit = 10,
       branchName,
+      bankName,
       isRecovered,
       search,
       sortBy = 'dateOfNPA',
@@ -145,6 +228,11 @@ router.get('/', protect, async (req, res) => {
     // Branch name filter
     if (branchName) {
       query.branchName = branchName;
+    }
+    
+    // Bank name filter
+    if (bankName) {
+      query.bankName = bankName;
     }
 
     // Recovery status filter
