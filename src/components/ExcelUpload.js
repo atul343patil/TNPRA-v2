@@ -4,7 +4,7 @@ import { CloudUpload as CloudUploadIcon } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { requiredColumns, columnMapping } from '../utils/sampleData';
 
-const ExcelUpload = ({ onDataUpload }) => {
+const ExcelUpload = ({ onDataUpload, refreshTrigger }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [officers, setOfficers] = useState([]);
@@ -15,33 +15,38 @@ const ExcelUpload = ({ onDataUpload }) => {
   const fileInputRef = useRef(null);
   
   // Fetch officers from the backend
-  useEffect(() => {
-    const fetchOfficers = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch('http://localhost:5000/api/auth/users', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Fetched users:', data);
-          // Filter only OFFICER role users
-          const officersList = data.filter(user => user.role === 'OFFICER');
-          console.log('Filtered officers:', officersList);
-          setOfficers(officersList);
-        } else {
-          console.error('Failed to fetch officers, response not OK:', response.status);
+  const fetchOfficers = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5000/api/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      } catch (err) {
-        console.error('Failed to fetch officers:', err);
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Filter only OFFICER role users
+        const officersList = data.filter(user => user.role === 'OFFICER');
+        console.log('Filtered officers:', officersList);
+        setOfficers(officersList);
+        
+        // If there's no selected officer but we have officers, select the first one
+        if (!selectedOfficer && officersList.length > 0) {
+          setSelectedOfficer(officersList[0].username);
+        }
+      } else {
+        console.error('Failed to fetch officers, response not OK:', response.status);
       }
-    };
-    
+    } catch (err) {
+      console.error('Failed to fetch officers:', err);
+    }
+  };
+  
+  // Fetch officers when component mounts or when refreshTrigger changes
+  useEffect(() => {
     fetchOfficers();
-  }, []);
+  }, [refreshTrigger]); // This will re-run when refreshTrigger changes
 
   const validateExcelData = (data) => {
     if (!Array.isArray(data) || data.length === 0) {

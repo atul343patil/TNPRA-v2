@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -21,12 +21,14 @@ import {
   Card,
   CardContent,
   Grid,
+  CircularProgress,
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import ExcelUpload from '../components/ExcelUpload';
 import { useRecovery } from '../context/RecoveryContext';
+import axios from 'axios';
 
 const UserManagement = () => {
   const { user: currentUser, register } = useAuth();
@@ -36,6 +38,7 @@ const UserManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { recoveryStats } = useRecovery();
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to trigger officer list refresh
 
   const [formData, setFormData] = useState({
     username: '',
@@ -43,6 +46,7 @@ const UserManagement = () => {
     role: 'OFFICER',
     branch: 'HEAD_OFFICE' // Adding default branch
   });
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   // State for Excel data processing
   const [dashboardData, setDashboardData] = useState({
@@ -70,7 +74,7 @@ const UserManagement = () => {
     }
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch('http://localhost:5000/api/auth/users', {
@@ -86,7 +90,7 @@ const UserManagement = () => {
     } catch (err) {
       setError('Failed to fetch users');
     }
-  };
+  }, []);
 
   const handleOpenDialog = (user = null) => {
     if (user) {
@@ -125,6 +129,7 @@ const UserManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitLoading(true);
     try {
       if (selectedUser) {
         // Update existing user
@@ -146,39 +151,58 @@ const UserManagement = () => {
         await register(formData);
       }
 
+      // Close dialog immediately
+      handleCloseDialog();
+      
+      // Update data and show success message
+      await fetchUsers();
+      setRefreshTrigger(prev => prev + 1);
       setSuccess(selectedUser ? 'User updated successfully' : 'User created successfully');
-      fetchUsers();
+      
+      // Clear success message after delay
       setTimeout(() => {
-        handleCloseDialog();
         setSuccess('');
-      }, 1500);
+      }, 3000);
     } catch (err) {
       setError(err.message);
+      setSubmitLoading(false); // Only reset loading on error
     }
   };
+
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     try {
+      setDeleteLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/auth/users/${userId}`, {
-        method: 'DELETE',
+      
+      // Use axios instead of fetch for better error handling
+      await axios.delete(`http://localhost:5000/api/auth/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
-      }
-
+      // If we get here, the delete was successful
       setSuccess('User deleted successfully');
-      fetchUsers();
+      
+      // Remove the deleted user from the local state to avoid having to refetch
+      setUsers(prevUsers => prevUsers.filter(user => user._id !== userId));
+      
+      // Also trigger a refresh for the officer dropdown
+      setRefreshTrigger(prev => prev + 1);
+      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to delete user');
+      console.error('Delete error:', err);
+      // Extract error message from axios response
+      const errorMsg = err.response?.data?.message || 'Failed to delete user';
+      setError(errorMsg);
       setTimeout(() => setError(''), 3000);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -344,9 +368,9 @@ const UserManagement = () => {
                     <IconButton
                       color="error"
                       onClick={() => handleDeleteUser(user._id)}
-                      disabled={user._id === currentUser?._id}
+                      disabled={user._id === currentUser?._id || deleteLoading}
                     >
-                      <DeleteIcon />
+                      {deleteLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -402,9 +426,20 @@ const UserManagement = () => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained">
-              {selectedUser ? 'Update' : 'Create'}
+            <Button onClick={handleCloseDialog} disabled={submitLoading}>Cancel</Button>
+            <Button 
+              onClick={handleSubmit} 
+              variant="contained"
+              disabled={submitLoading}
+            >
+              {submitLoading ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  {selectedUser ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                selectedUser ? 'Update' : 'Create'
+              )}
             </Button>
           </DialogActions>
         </Dialog>
@@ -417,7 +452,7 @@ const UserManagement = () => {
                 Data Management
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <ExcelUpload onDataUpload={processExcelData} />
+                <ExcelUpload onDataUpload={processExcelData} refreshTrigger={refreshTrigger} />
               </Box>
             </CardContent>
           </Card>

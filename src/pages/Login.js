@@ -12,6 +12,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import Header from "../components/Header";
+import BackgroundImage from "../assets/BackgroundImage.jpg";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -36,15 +38,29 @@ const Login = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+    <div className="relative h-screen overflow-hidden bg-[#242424]">
+      {/* Header on top */}
+      <div className="relative z-20 w-full bg-[#242424]/90">
+        <Header />
+      </div>
+
+      {/* Background Image & Gradient */}
+      <div className="absolute inset-0 z-0 bg-cover bg-center opacity-25" 
+        style={{ backgroundImage: `url(${BackgroundImage})` }} 
       >
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black"></div> {/* Overlay */}
+      </div>
+      
+      {/* Login Form */}
+      <Container component="main" maxWidth="xs" className="relative z-10">
+        <Box
+          sx={{
+            minHeight: '90vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -60,10 +76,12 @@ const Login = () => {
               alignItems: 'center',
             }}
           >
-            <Typography component="h1" variant="h4" gutterBottom color="primary">
-              THE NASHIK PEOPLE RECOVERY AGENCY
-            </Typography>
-            <Typography component="h2" variant="h6" color="textSecondary" gutterBottom>
+            <Typography component="h1" variant="h4" gutterBottom color="primary" sx={{ 
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              mb: 3,
+              fontFamily: 'Poppins, sans-serif'
+            }}>
               LOGIN
             </Typography>
 
@@ -107,7 +125,7 @@ const Login = () => {
                 sx={{ mt: 3, mb: 2, py: 1.5 }}
                 disabled={loading}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Login'}
               </Button>
 
               
@@ -116,6 +134,7 @@ const Login = () => {
         </motion.div>
       </Box>
     </Container>
+    </div>
   );
 };
 

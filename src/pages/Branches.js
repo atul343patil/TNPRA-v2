@@ -6,8 +6,10 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon, AccountBalance as BankIcon, Person as PersonIcon, SupervisorAccount as OfficerIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Branches = () => {
+  const { user } = useAuth();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,8 +53,13 @@ const Branches = () => {
     // Just filter the branches client-side since it's a small dataset
   };
 
+  // Filter branches based on officer assignment
+  const branchesForUser = user?.isOfficer
+    ? branches.filter(branch => branch.officers.includes(user.username))
+    : branches;
+  
   // Filter branches based on search term
-  const filteredBranches = branches.filter(branch => 
+  const filteredBranches = branchesForUser.filter(branch => 
     branch.branchName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     branch.bankName?.toLowerCase().includes(searchTerm.toLowerCase())
   );

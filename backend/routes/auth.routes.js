@@ -110,9 +110,15 @@ router.put('/users/:id', protect, authorize('ADMIN'), async (req, res) => {
 // @access  Admin only
 router.delete('/users/:id', protect, authorize('ADMIN'), async (req, res) => {
   try {
+    // Check if user exists
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent deleting self
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
     }
 
     // Prevent deleting the last admin
@@ -123,11 +129,17 @@ router.delete('/users/:id', protect, authorize('ADMIN'), async (req, res) => {
       }
     }
 
-    await user.remove();
-    res.json({ message: 'User removed' });
+    // Use deleteOne instead of findByIdAndDelete for more explicit error handling
+    const result = await User.deleteOne({ _id: req.params.id });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'User could not be deleted' });
+    }
+    
+    res.json({ message: 'User successfully removed', success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error deleting user:', err);
+    res.status(500).json({ message: 'Server error: ' + err.message });
   }
 });
 

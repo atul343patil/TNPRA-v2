@@ -15,6 +15,7 @@ import Customers from './pages/Customers';
 import CustomerDetails from './pages/CustomerDetails';
 import Reports from './pages/Reports';
 import UserManagement from './pages/UserManagement';
+import AboutUs from './pages/AboutUs';
 
 // Import components
 import Layout from './components/Layout';
@@ -43,6 +44,7 @@ function AppContent() {
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route path="/about" element={<AboutUs />} />
         
         {/* Protected routes */}
         <Route
