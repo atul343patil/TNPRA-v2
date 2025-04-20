@@ -2,10 +2,20 @@ import React from "react";
 import { Mail, Phone, LocationOn } from "@mui/icons-material";
 
 export default function ContactInfo() {
+  const handleContactClick = () => {
+    window.open(
+      "https://mail.google.com/mail/?view=cm&fs=1&to=nashikpeoplesrecoveryagency@gmail.com&su=Inquiry%20for%20The%20Nashik%20Peoples%20Recovery%20Agency",
+      "_blank"
+    );
+  };
+
   return (
     <div className="flex flex-row mt-10">
       <div className="basis-1/3">
-        <button className="mt-6 ml-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full shadow-lg text-lg">
+        <button 
+          onClick={handleContactClick}
+          className="mt-6 ml-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full shadow-lg text-lg"
+        >
           Contact Now
         </button>
       </div>  
